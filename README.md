@@ -114,8 +114,8 @@ graph TD
 
     %% Connections
     State <-->|طلبات البحث النصي| API
-    State <-->|جلب صفحات PDF مباشرة (CORS)| PDFs
-    Backend -.->|تحميل DB عند الإقلاع (boto3)| DB_File
+    State <-->|جلب صفحات PDF مباشرة بفضل CORS| PDFs
+    Backend -.->|تحميل DB عند الإقلاع عبر boto3| DB_File
 
     %% Styling
     classDef pres fill:#E3F2FD,stroke:#2196F3,stroke-width:2px,color:#0D47A1;
