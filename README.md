@@ -13,8 +13,9 @@
     <img src="https://img.shields.io/badge/Frontend-Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter">
     <img src="https://img.shields.io/badge/State_Management-Riverpod-042B59?style=for-the-badge&logo=flutter&logoColor=white" alt="Riverpod">
     <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-    <img src="https://img.shields.io/badge/Database-SQLite_(Drift)-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite Drift">
-    <img src="https://img.shields.io/badge/Cloud-Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Cloudflare">
+    <img src="https://img.shields.io/badge/Database-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
+    <img src="https://img.shields.io/badge/Storage-Cloudflare_R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Cloudflare R2">
+    <img src="https://img.shields.io/badge/Hosting-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white" alt="Render">
   </p>
 
   [تجربة النسخة الحية](https://hadithresearchlibrary.pages.dev/)
@@ -68,9 +69,19 @@
 * &rlm;**هيكلة البيانات:**
     * &rlm;**امتداد .jsoni:** هو هيكلية خصصتها للمشروع وهو العصب الأساسي للبيانات في هذا المشروع، حيث تُحفظ جميع المخرجات (نصوص، إحداثيات، بيانات وصفية للكتب، وعناصر الأبحاث) داخل ملفات مهيكلة بدقة شديدة لتسهيل مراجعتها وتصنيفها لاحقاً .
 
-## &rlm;🏗️ الهيكلية البرمجية (Technical Architecture)
+## &rlm;🏗️ الهيكلية البرمجية وآلية العمل (Technical Architecture & Workflow)
 
-يعتمد المشروع على **المعمارية النظيفة (Clean Architecture)** لضمان أقصى درجات المرونة، وقابلية التوسع والصيانة، مع تطبيق مبادئ (SOLID) واستخدام أنماط التصميم مثل (Repository Pattern). يوضح المخطط التالي دورة تدفق البيانات وتفاعل المكونات:
+يعتمد المشروع على **المعمارية النظيفة (Clean Architecture)** لضمان أقصى درجات المرونة، وقابلية التوسع والصيانة. وقد تم تصميم البنية التحتية السحابية بعناية لتقديم أداء فائق بأقل تكلفة ممكنة، وتتكون من:
+
+### &rlm;1. أماكن الاستضافة (Infrastructure)
+* &rlm;**قاعدة البيانات ومصورات الـ PDF:** مستضافة على سحابة **Cloudflare R2**، وهي بيئة تخزين توفر نقل بيانات سريعاً ومجانياً (Zero Egress Fees).
+* &rlm;**الخادم الخلفي (Backend API):** مبرمج بلغة **Python (FastAPI)** ومستضاف كخدمة ويب على منصة **Render**.
+* &rlm;**الواجهة الأمامية (Frontend):** تم تحويل تطبيق **Flutter** إلى نسخة ويب (Web App) ومستضاف على **Cloudflare Pages** ليكون متاحاً للباحثين عبر رابط مباشر.
+
+### &rlm;2. آلية عمل النظام السحابي (Workflow)
+* &rlm;**التأمين والإقلاع:** عند تشغيل خادم Render، يقوم آلياً بالاتصال بسحابة Cloudflare R2 عبر مفاتيح سرية (باستخدام مكتبة `boto3`) لتحميل ملف قاعدة البيانات `app_database.db` إلى ذاكرته. هذا يضمن أن قاعدة البيانات "خاصة" ومحمية تماماً من السرقة.
+* &rlm;**معالجة البحث بلمح البصر:** عندما يكتب الباحث مصطلحاً في واجهة Flutter، يُرسل الطلب إلى الـ (API) في خادم Render. يقوم الخادم بالبحث داخل (SQLite) باستخدام محرك (FTS5) ويرجع المقتطفات مع أسماء الأبحاث وأرقام الصفحات.
+* &rlm;**تخفيف الأحمال (Streaming):** عند رغبة الباحث في فتح المرجع وقراءة الـ PDF، لا يتدخل خادم Render إطلاقاً لتفادي اختناق الذاكرة. بدلاً من ذلك، يتصل تطبيق Flutter مباشرة بـ (Cloudflare R2) ويجلب الصفحة المطلوبة فقط بفضل تفعيل بروتوكول (CORS Rules).
 
 <div align="center">
 
@@ -79,46 +90,41 @@ graph TD
     direction TB
     
     %% Presentation Layer
-    subgraph Presentation["📱 طبقة العرض (Flutter Web Client)"]
+    subgraph Presentation["📱 الواجهة الأمامية (Flutter on Cloudflare Pages)"]
         direction TB
         UI["واجهة المستخدم (UI Components)"]
-        State["إدارة الحالة (Riverpod / Providers)"]
+        State["إدارة الحالة (Riverpod)"]
         UI <--> State
     end
 
-    %% Domain Layer
-    subgraph Domain["🧠 طبقة النطاق (Business Logic)"]
+    %% Backend Layer
+    subgraph Backend["⚙️ الخادم الخلفي (FastAPI on Render)"]
         direction TB
-        UseCases["محركات البحث والتزامن (Search & Sync Engines)"]
-        Entities["الكيانات الأساسية (Core Entities)"]
-        UseCases --> Entities
+        API["واجهة برمجة التطبيقات (API)"]
+        InMemDB["قاعدة بيانات بالذاكرة (SQLite FTS5)"]
+        API <--> InMemDB
     end
 
-    %% Data & Infrastructure Layer
-    subgraph Data["☁️ طبقة البيانات والبنية التحتية (Data & Cloud)"]
+    %% Cloud Infrastructure
+    subgraph Cloud["☁️ التخزين السحابي (Cloudflare R2)"]
         direction TB
-        Repos["مستودعات البيانات (Repositories)"]
-        LocalDB["قاعدة بيانات محلية (SQLite / Drift)"]
-        CF_API["خوادم سحابية (Cloudflare Workers API)"]
-        CF_R2["مخزن السحابة للملفات (Cloudflare R2 Bucket)"]
-        
-        Repos <--> LocalDB
-        Repos <--> CF_API
-        CF_API <--> CF_R2
+        DB_File["ملف قاعدة البيانات (app_database.db)"]
+        PDFs["مصورات الأبحاث (PDFs)"]
     end
 
-    %% Connections between layers
-    State <-->|تحديث الحالة| UseCases
-    UseCases <-->|طلب بيانات| Repos
+    %% Connections
+    State <-->|طلبات البحث النصي| API
+    State <-->|جلب صفحات PDF مباشرة (CORS)| PDFs
+    Backend -.->|تحميل DB عند الإقلاع (boto3)| DB_File
 
     %% Styling
     classDef pres fill:#E3F2FD,stroke:#2196F3,stroke-width:2px,color:#0D47A1;
-    classDef dom fill:#F3E5F5,stroke:#9C27B0,stroke-width:2px,color:#4A148C;
-    classDef dat fill:#E8F5E9,stroke:#4CAF50,stroke-width:2px,color:#1B5E20;
+    classDef back fill:#F3E5F5,stroke:#9C27B0,stroke-width:2px,color:#4A148C;
+    classDef cloud fill:#E8F5E9,stroke:#4CAF50,stroke-width:2px,color:#1B5E20;
     
     class UI,State pres;
-    class Entities,UseCases dom;
-    class Repos,LocalDB,CF_API,CF_R2 dat;
+    class API,InMemDB back;
+    class DB_File,PDFs cloud;
 ```
 
 </div>
@@ -126,10 +132,11 @@ graph TD
 ### &rlm;التقنيات المستخدمة:
 * &rlm;**تطوير واجهات المستخدم (Flutter & Dart):** لبناء واجهات مستخدم سلسة وعالية الأداء تعمل على مختلف أنظمة التشغيل من كود برمجي واحد.
 * &rlm;**إدارة الحالة (Riverpod):** لإدارة حالة التطبيق بشكل تفاعلي وآمن.
-* &rlm;**قواعد البيانات (Drift / SQLite):** لبناء قاعدة بيانات محلية قوية تدعم التخزين المؤقت والبحث السريع (Offline-first).
-* &rlm;**الخوادم السحابية:** تم استخدام **Python & FastAPI** و **Cloudflare Workers API** لمعالجة البيانات الكثيفة وسرعة الاستجابة، بالإضافة إلى **Cloudflare R2 Bucket** لتخزين الملفات السحابية كبديل لـ AWS S3.
-* &rlm;**التعامل مع المستندات:** مكتبة **pdfrx** لعرض ومعالجة ملفات PDF بمزامنة دقيقة.
-* &rlm;**معالجة النصوص المتقدمة (Regex):** استخدام التعابير النمطية (Regular Expressions) لفلترة النصوص العربية، وتوحيد الهمزات والتشكيل والاختلافات الإملائية، مما يضمن دقة ومرونة عالية جداً في مطابقة نتائج البحث.
+* &rlm;**الخادم الخلفي (Python & FastAPI):** لمعالجة طلبات البحث بسرعة فائقة ومرونة عالية، مستضاف على Render.
+* &rlm;**التخزين السحابي (Cloudflare R2 & Pages):** لتقديم واجهة الويب، وتخزين مصورات الأبحاث وقاعدة البيانات بكفاءة وبدون تكاليف نقل بيانات (Zero Egress Fees).
+* &rlm;**قواعد البيانات (SQLite & FTS5):** للبحث النصي فائق السرعة والمطابقة الدقيقة.
+* &rlm;**التعامل مع المستندات:** مكتبة **pdfrx** لعرض ومعالجة ملفات PDF بمزامنة دقيقة ومباشرة من السحابة.
+* &rlm;**معالجة النصوص المتقدمة (Regex):** استخدام التعابير النمطية لفلترة النصوص العربية، وتوحيد الهمزات والتشكيل، مما يضمن دقة عالية جداً في نتائج البحث.
 
 ## &rlm;🔒 ملاحظة حول الكود المصدري (مستودع عرض فقط)
 
